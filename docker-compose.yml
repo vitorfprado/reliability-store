@@ -1,0 +1,88 @@
+﻿networks:
+  reliability-store:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:16
+    networks:
+      - reliability-store
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reliability}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reliability}
+      POSTGRES_DB: ${POSTGRES_DB:-reliability_store}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reliability} -d ${POSTGRES_DB:-reliability_store}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    networks:
+      - reliability-store
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://reliability:reliability@postgres:5432/reliability_store}
+      APP_NAME: ${APP_NAME:-Reliability Store API}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build: ./frontend
+    networks:
+      - reliability-store
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    networks:
+      - reliability-store
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:latest
+    networks:
+      - reliability-store
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  grafana_data:
