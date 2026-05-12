@@ -1,13 +1,10 @@
 ﻿type HeaderProps = {
   cartItemCount: number;
-  onCartAnchorClick?: () => void;
+  onGoHome: () => void;
+  onGoToCart: () => void;
 };
 
-const DOCS = "http://localhost:8000/docs";
-const PROM = "http://localhost:9090";
-const GRAF = "http://localhost:3000";
-
-export function Header({ cartItemCount, onCartAnchorClick }: HeaderProps) {
+export function Header({ cartItemCount, onGoHome, onGoToCart }: HeaderProps) {
   return (
     <header className="site-header">
       <div className="site-header__inner">
@@ -17,27 +14,24 @@ export function Header({ cartItemCount, onCartAnchorClick }: HeaderProps) {
           </span>
           <div>
             <h1 className="site-header__title">Reliability Store</h1>
-            <p className="site-header__tagline">Loja demonstrativa para confiabilidade e observabilidade</p>
+            <p className="site-header__tagline">Sua loja de tecnologia para estudo, trabalho e produtividade</p>
           </div>
         </div>
-        <nav className="site-header__nav" aria-label="Links externos">
-          <a href={DOCS} target="_blank" rel="noreferrer">
-            API Docs
-          </a>
-          <a href={PROM} target="_blank" rel="noreferrer">
-            Prometheus
-          </a>
-          <a href={GRAF} target="_blank" rel="noreferrer">
-            Grafana
-          </a>
+        <nav className="site-header__nav" aria-label="Navegação principal">
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onGoHome}>
+            Início
+          </button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onGoToCart}>
+            Carrinho
+          </button>
         </nav>
-        <a href="#carrinho" className="site-header__cart" onClick={() => onCartAnchorClick?.()}>
+        <button type="button" className="site-header__cart" onClick={onGoToCart}>
           <span className="site-header__cart-icon" aria-hidden>
             🛒
           </span>
           <span className="site-header__cart-label">Carrinho</span>
           <span className="site-header__cart-badge">{cartItemCount}</span>
-        </a>
+        </button>
       </div>
     </header>
   );

@@ -8,16 +8,29 @@ export type CartItem = {
 
 type CartProps = {
   items: CartItem[];
+  shipping: number;
   onIncrease: (productId: number) => void;
   onDecrease: (productId: number) => void;
   onRemove: (productId: number) => void;
   onClear: () => void;
-  onCheckout: () => void;
+  onContinueShopping: () => void;
+  onGoToCheckout: () => void;
   loading: boolean;
 };
 
-export function Cart({ items, onIncrease, onDecrease, onRemove, onClear, onCheckout, loading }: CartProps) {
-  const total = items.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+export function Cart({
+  items,
+  shipping,
+  onIncrease,
+  onDecrease,
+  onRemove,
+  onClear,
+  onContinueShopping,
+  onGoToCheckout,
+  loading,
+}: CartProps) {
+  const subtotal = items.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+  const total = subtotal + (items.length > 0 ? shipping : 0);
 
   return (
     <aside id="carrinho" className="cart-panel">
@@ -40,6 +53,9 @@ export function Cart({ items, onIncrease, onDecrease, onRemove, onClear, onCheck
             <br />
             Adicione produtos para iniciar uma compra.
           </p>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={onContinueShopping}>
+            Voltar para produtos
+          </button>
         </div>
       ) : (
         <ul className="cart-panel__list">
@@ -78,11 +94,22 @@ export function Cart({ items, onIncrease, onDecrease, onRemove, onClear, onCheck
 
       <div className="cart-panel__foot">
         <div className="cart-panel__total-row">
+          <span>Subtotal</span>
+          <strong>{formatBrl(subtotal)}</strong>
+        </div>
+        <div className="cart-panel__total-row">
+          <span>Frete simulado</span>
+          <strong>{formatBrl(shipping)}</strong>
+        </div>
+        <div className="cart-panel__total-row cart-panel__total-row--grand">
           <span>Total</span>
           <strong>{formatBrl(total)}</strong>
         </div>
-        <button type="button" className="btn btn--primary cart-panel__checkout" onClick={onCheckout} disabled={items.length === 0 || loading}>
-          {loading ? "Finalizando…" : "Finalizar compra"}
+        <button type="button" className="btn btn--secondary cart-panel__checkout" onClick={onContinueShopping}>
+          Continuar comprando
+        </button>
+        <button type="button" className="btn btn--primary cart-panel__checkout" onClick={onGoToCheckout} disabled={items.length === 0 || loading}>
+          Finalizar compra
         </button>
       </div>
     </aside>

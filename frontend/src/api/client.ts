@@ -54,6 +54,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   getProducts: () => request<Product[]>("/products"),
+  getProduct: (productId: number) => request<Product>(`/products/${productId}`),
   checkout: (items: CartItemPayload[]) =>
     request<{ order_id: number; status: string; message: string; total: number }>("/checkout", {
       method: "POST",
