@@ -14,7 +14,8 @@
       "Bash(curl -sv http://localhost/)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} - GET /products\\\\n\" http://localhost/products)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} - GET /orders\\\\n\" http://localhost/orders)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(python -m json.tool)"
     ]
   }
 }

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .. import fault_flags
 from ..inventory_client import get_bulk_stock, get_stock
 from ..models import Product
 from ..schemas import ProductResponse
@@ -18,6 +19,9 @@ logger = logging.getLogger(__name__)
 async def list_products(db: Session = Depends(get_db)):
     if simulation_state.catalog_unavailable.enabled:
         raise HTTPException(status_code=503, detail="Catálogo temporariamente indisponível")
+    flags = fault_flags.get_flags()
+    if flags.get("globalApiError500") or flags.get("productListError500"):
+        raise HTTPException(status_code=500, detail="Falha simulada na listagem de produtos")
     products = db.execute(select(Product).order_by(Product.id.asc())).scalars().all()
     stock_map = await get_bulk_stock([p.id for p in products])
     return [
@@ -39,6 +43,9 @@ async def list_products(db: Session = Depends(get_db)):
 async def get_product(product_id: int, db: Session = Depends(get_db)):
     if simulation_state.product_error.enabled and simulation_state.product_error.product_id == product_id:
         raise HTTPException(status_code=500, detail="Falha simulada para produto específico")
+    flags = fault_flags.get_flags()
+    if flags.get("globalApiError500") or flags.get("productDetailError500"):
+        raise HTTPException(status_code=500, detail="Falha simulada no detalhe do produto")
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Produto não encontrado")

@@ -3,9 +3,10 @@ type HeaderProps = {
   onGoHome: () => void;
   onGoToCart: () => void;
   onGoToInventory: () => void;
+  onGoToFaultLab: () => void;
 };
 
-export function Header({ cartItemCount, onGoHome, onGoToCart, onGoToInventory }: HeaderProps) {
+export function Header({ cartItemCount, onGoHome, onGoToCart, onGoToInventory, onGoToFaultLab }: HeaderProps) {
   return (
     <header className="site-header">
       <div className="site-header__inner">
@@ -27,6 +28,9 @@ export function Header({ cartItemCount, onGoHome, onGoToCart, onGoToInventory }:
           </button>
           <button type="button" className="btn btn--ghost btn--sm" onClick={onGoToInventory}>
             Estoque
+          </button>
+          <button type="button" className="btn btn--ghost btn--sm header-faultlab-btn" onClick={onGoToFaultLab}>
+            Fault Lab
           </button>
         </nav>
         <button type="button" className="site-header__cart" onClick={onGoToCart}>

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .. import fault_flags
 from ..metrics import (
     checkout_attempts_total,
     checkout_duration_seconds,
@@ -37,6 +38,22 @@ async def checkout(payload: CheckoutRequest, db: Session = Depends(get_db)):
         min_delay = simulation_state.checkout_latency.min_delay_ms / 1000
         max_delay = simulation_state.checkout_latency.max_delay_ms / 1000
         time.sleep(random.uniform(min_delay, max_delay))
+
+    flags = fault_flags.get_flags()
+
+    # Latência artificial do fault lab (aplicada antes do erro para simular checkout lento + falho)
+    if flags.get("checkoutLatency"):
+        time.sleep(flags.get("checkoutLatencyMs", 5000) / 1000)
+
+    if flags.get("globalApiError500"):
+        checkout_failure_total.labels(failure_reason="fault_injection").inc()
+        checkout_duration_seconds.observe(time.perf_counter() - started)
+        raise HTTPException(status_code=500, detail={"status": "failed", "reason": "fault_injection", "message": "API com falha simulada"})
+
+    if flags.get("checkoutError500"):
+        checkout_failure_total.labels(failure_reason="fault_injection").inc()
+        checkout_duration_seconds.observe(time.perf_counter() - started)
+        raise HTTPException(status_code=500, detail={"status": "failed", "reason": "fault_injection", "message": "Erro simulado no checkout"})
 
     if simulation_state.checkout_error.enabled and random.random() < simulation_state.checkout_error.error_rate:
         checkout_failure_total.labels(failure_reason="simulation_error").inc()
