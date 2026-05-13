@@ -1,4 +1,4 @@
-﻿networks:
+networks:
   reliability-store:
     driver: bridge
 
@@ -21,37 +21,104 @@ services:
       timeout: 5s
       retries: 10
 
-  backend:
-    build: ./backend
+  inventory-service:
+    build: ./inventory-service
     networks:
       - reliability-store
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://reliability:reliability@postgres:5432/reliability_store}
-      APP_NAME: ${APP_NAME:-Reliability Store API}
+      APP_NAME: inventory-service
       ENVIRONMENT: ${ENVIRONMENT:-local}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5173,http://127.0.0.1:5173}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "8003:8003"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  product-service:
+    build: ./product-service
+    networks:
+      - reliability-store
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://reliability:reliability@postgres:5432/reliability_store}
+      APP_NAME: product-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      INVENTORY_SERVICE_URL: http://inventory-service:8003
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5173,http://127.0.0.1:5173}
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    build: ./order-service
+    networks:
+      - reliability-store
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://reliability:reliability@postgres:5432/reliability_store}
+      APP_NAME: order-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      PRODUCT_SERVICE_URL: http://product-service:8001
+      INVENTORY_SERVICE_URL: http://inventory-service:8003
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5173,http://127.0.0.1:5173}
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api-gateway:
+    image: nginx:1.27-alpine
+    networks:
+      - reliability-store
+    ports:
+      - "${BACKEND_PORT:-80}:80"
+    volumes:
+      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      frontend:
+        condition: service_started
 
   frontend:
     build: ./frontend
     networks:
       - reliability-store
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
-    depends_on:
-      backend:
-        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:latest
@@ -59,12 +126,17 @@ services:
       - reliability-store
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-remote-write-receiver"
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
-      backend:
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      inventory-service:
         condition: service_healthy
 
   grafana:
@@ -74,6 +146,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
     ports:
       - "${GRAFANA_PORT:-3000}:3000"
     volumes:
@@ -82,7 +155,61 @@ services:
     depends_on:
       prometheus:
         condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+
+  loki:
+    image: grafana/loki:3.2.0
+    networks:
+      - reliability-store
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./loki/loki.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/config.yml
+
+  promtail:
+    image: grafana/promtail:3.2.0
+    networks:
+      - reliability-store
+    volumes:
+      - ./promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_started
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    networks:
+      - reliability-store
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/config.yml:ro
+      - tempo_data:/var/tempo
+    command: -config.file=/etc/tempo/config.yml
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    networks:
+      - reliability-store
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./otel-collector/otel-collector.yml:/etc/otel-collector/config.yml:ro
+    command: ["--config=/etc/otel-collector/config.yml"]
+    depends_on:
+      tempo:
+        condition: service_started
 
 volumes:
   postgres_data:
   grafana_data:
+  loki_data:
+  tempo_data:

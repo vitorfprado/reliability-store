@@ -35,3 +35,6 @@ build/
 .venv/
 venv/
 env/
+
+# Claude
+.claude/*
