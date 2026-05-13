@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from .database import Base, SessionLocal, engine, wait_for_database
 from .metrics import get_metrics_response, track_http_metrics
-from .routes import admin, health, products
+from .routes import admin, fault_admin, health, products
 from .seed import seed_products
 from .simulation import initialize_simulation_metrics, reset_simulations
 from .telemetry import setup_telemetry
@@ -51,6 +51,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
 app.include_router(health.router)
 app.include_router(products.router)
 app.include_router(admin.router)
+app.include_router(fault_admin.router)
 
 
 @app.get("/metrics", include_in_schema=False)

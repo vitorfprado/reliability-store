@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from .database import Base, SessionLocal, engine, wait_for_database
 from .metrics import get_metrics_response, track_http_metrics
-from .routes import admin, checkout, health, orders
+from .routes import admin, checkout, fault_admin, health, orders
 from .simulation import initialize_simulation_metrics, reset_simulations
 from .telemetry import setup_telemetry
 
@@ -51,6 +51,7 @@ app.include_router(health.router)
 app.include_router(checkout.router)
 app.include_router(orders.router)
 app.include_router(admin.router)
+app.include_router(fault_admin.router)
 
 
 @app.get("/metrics", include_in_schema=False)

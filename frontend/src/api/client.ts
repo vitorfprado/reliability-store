@@ -1,5 +1,14 @@
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "http://localhost:8000";
 
+export interface FaultFlags {
+  checkoutError500: boolean;
+  checkoutLatency: boolean;
+  checkoutLatencyMs: number;
+  globalApiError500: boolean;
+  productListError500: boolean;
+  productDetailError500: boolean;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -76,4 +85,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ delta }),
     }),
+  getFaultFlags: () => request<FaultFlags>("/admin/fault-flags"),
+  patchFaultFlags: (updates: Partial<FaultFlags>) =>
+    request<FaultFlags>("/admin/fault-flags", {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+  resetFaultFlags: () =>
+    request<FaultFlags>("/admin/fault-flags/reset", { method: "POST" }),
 };
