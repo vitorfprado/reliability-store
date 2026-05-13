@@ -21,6 +21,27 @@ services:
       timeout: 5s
       retries: 10
 
+  inventory-service:
+    build: ./inventory-service
+    networks:
+      - reliability-store
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://reliability:reliability@postgres:5432/reliability_store}
+      APP_NAME: inventory-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5173,http://127.0.0.1:5173}
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   product-service:
     build: ./product-service
     networks:
@@ -29,12 +50,15 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://reliability:reliability@postgres:5432/reliability_store}
       APP_NAME: product-service
       ENVIRONMENT: ${ENVIRONMENT:-local}
+      INVENTORY_SERVICE_URL: http://inventory-service:8003
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5173,http://127.0.0.1:5173}
     ports:
       - "8001:8001"
     depends_on:
       postgres:
+        condition: service_healthy
+      inventory-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
@@ -51,6 +75,7 @@ services:
       APP_NAME: order-service
       ENVIRONMENT: ${ENVIRONMENT:-local}
       PRODUCT_SERVICE_URL: http://product-service:8001
+      INVENTORY_SERVICE_URL: http://inventory-service:8003
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5173,http://127.0.0.1:5173}
     ports:
@@ -59,6 +84,8 @@ services:
       postgres:
         condition: service_healthy
       product-service:
+        condition: service_healthy
+      inventory-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
@@ -78,6 +105,8 @@ services:
       product-service:
         condition: service_healthy
       order-service:
+        condition: service_healthy
+      inventory-service:
         condition: service_healthy
       frontend:
         condition: service_started
@@ -106,6 +135,8 @@ services:
       product-service:
         condition: service_healthy
       order-service:
+        condition: service_healthy
+      inventory-service:
         condition: service_healthy
 
   grafana:

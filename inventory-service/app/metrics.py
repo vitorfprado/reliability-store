@@ -10,7 +10,7 @@ http_request_duration_seconds = Histogram(
     ["method", "path", "status_code"],
     buckets=(0.05, 0.1, 0.2, 0.4, 0.8, 1, 2, 5, 10),
 )
-simulation_mode_enabled = Gauge("simulation_mode_enabled", "Estado dos modos de simulação", ["mode"])
+inventory_stock_quantity = Gauge("inventory_stock_quantity", "Estoque atual por produto", ["product_id"])
 
 
 def get_metrics_response() -> Response:

@@ -6,14 +6,13 @@ from fastapi.responses import JSONResponse
 
 from .database import Base, SessionLocal, engine, wait_for_database
 from .metrics import get_metrics_response, track_http_metrics
-from .routes import admin, health, products
-from .seed import seed_products
-from .simulation import initialize_simulation_metrics, reset_simulations
+from .routes import health, inventory
+from .seed import refresh_inventory_stock_gauge, seed_inventory
 from .telemetry import setup_telemetry
 
-app = FastAPI(title="Product Service", version="1.0.0")
+app = FastAPI(title="Inventory Service", version="1.0.0")
 
-setup_telemetry(app, service_name="product-service", db_engine=engine)
+setup_telemetry(app, service_name="inventory-service", db_engine=engine)
 
 _origins_default = "http://localhost:5173,http://127.0.0.1:5173"
 app.add_middleware(
@@ -36,9 +35,8 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        seed_products(db)
-        reset_simulations()
-        initialize_simulation_metrics()
+        seed_inventory(db)
+        refresh_inventory_stock_gauge(db)
     finally:
         db.close()
 
@@ -49,8 +47,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(health.router)
-app.include_router(products.router)
-app.include_router(admin.router)
+app.include_router(inventory.router)
 
 
 @app.get("/metrics", include_in_schema=False)

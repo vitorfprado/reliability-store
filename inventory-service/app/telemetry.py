@@ -4,7 +4,6 @@ import os
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -49,7 +48,5 @@ def setup_telemetry(app, service_name: str, db_engine=None) -> None:
     trace.set_tracer_provider(provider)
 
     FastAPIInstrumentor.instrument_app(app)
-    # Instrumenta clientes httpx para propagar traceparent ao inventory-service
-    HTTPXClientInstrumentor().instrument()
     if db_engine is not None:
         SQLAlchemyInstrumentor().instrument(engine=db_engine)

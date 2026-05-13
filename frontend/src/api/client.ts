@@ -1,4 +1,4 @@
-﻿export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "http://localhost:8000";
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "http://localhost:8000";
 
 export interface Product {
   id: number;
@@ -7,6 +7,11 @@ export interface Product {
   price: number;
   stock_quantity: number;
   image_filename: string | null;
+}
+
+export interface InventoryItem {
+  product_id: number;
+  quantity: number;
 }
 
 export interface CartItemPayload {
@@ -59,5 +64,16 @@ export const api = {
     request<{ order_id: number; status: string; message: string; total: number }>("/checkout", {
       method: "POST",
       body: JSON.stringify({ items }),
+    }),
+  getInventory: () => request<InventoryItem[]>("/inventory"),
+  setStock: (productId: number, quantity: number) =>
+    request<InventoryItem>(`/inventory/${productId}`, {
+      method: "PUT",
+      body: JSON.stringify({ quantity }),
+    }),
+  adjustStock: (productId: number, delta: number) =>
+    request<InventoryItem>(`/inventory/${productId}/adjust`, {
+      method: "POST",
+      body: JSON.stringify({ delta }),
     }),
 };

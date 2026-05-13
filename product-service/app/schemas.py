@@ -16,5 +16,3 @@ class ProductResponse(BaseModel):
         from_attributes = True
 
 
-class StockUpdateRequest(BaseModel):
-    delta: int  # negativo para deduzir, positivo para repor

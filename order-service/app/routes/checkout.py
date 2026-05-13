@@ -15,7 +15,8 @@ from ..metrics import (
     orders_total,
 )
 from ..models import Order, OrderItem
-from ..product_client import deduct_stock, get_product
+from ..inventory_client import deduct_stock
+from ..product_client import get_product
 from ..schemas import CheckoutRequest
 from ..simulation import simulation_state
 
@@ -78,7 +79,7 @@ async def checkout(payload: CheckoutRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(order)
 
-        # Fase 3: deduzir estoque no product-service (cria spans filhos no trace)
+        # Fase 3: deduzir estoque no inventory-service (cria spans filhos no trace)
         for vi in validated_items:
             await deduct_stock(vi["product"]["id"], vi["quantity"])
 

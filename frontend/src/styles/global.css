@@ -1100,3 +1100,142 @@ body {
     order: 1;
   }
 }
+
+/* Inventory Manager */
+.inventory-page {
+  padding-top: 1.5rem;
+}
+
+.inventory-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.inventory-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.15s ease;
+}
+
+.inventory-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.inventory-card__media {
+  position: relative;
+  height: 100px;
+  display: grid;
+  place-items: center;
+}
+
+.inventory-card__body {
+  padding: 0.9rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  flex: 1;
+}
+
+.inventory-card__name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.inventory-card__price {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.inventory-card__stock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+}
+
+.inventory-card__stock-label {
+  font-size: 0.82rem;
+  color: var(--color-muted);
+}
+
+.inventory-card__stock-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.inventory-card__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inventory-card__quick {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.inventory-card__set {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.inventory-card__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.38rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--color-text);
+}
+
+.inventory-card__input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.inventory-toasts {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(360px, calc(100vw - 2.5rem));
+}
+
+.inventory-toast {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+}
+
+.inventory-toast--success {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #14532d;
+}
+
+.inventory-toast--error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #7f1d1d;
+}

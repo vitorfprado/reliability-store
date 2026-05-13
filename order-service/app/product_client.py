@@ -26,9 +26,3 @@ async def get_product(product_id: int) -> dict | None:
         raise
 
 
-async def deduct_stock(product_id: int, quantity: int) -> None:
-    response = await _client.put(
-        f"/products/{product_id}/stock",
-        json={"delta": -quantity},
-    )
-    response.raise_for_status()

@@ -6,6 +6,7 @@ import { CheckoutForm, type CheckoutPayload } from "./components/CheckoutForm";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { Hero } from "./components/Hero";
+import { InventoryManager } from "./components/InventoryManager";
 import { OrderConfirmation } from "./components/OrderConfirmation";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 import { ProductCard } from "./components/ProductCard";
@@ -34,7 +35,7 @@ export default function App() {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [activePage, setActivePage] = useState<"store" | "cart" | "checkout" | "confirmation">("store");
+  const [activePage, setActivePage] = useState<"store" | "cart" | "checkout" | "confirmation" | "inventory">("store");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [lastOrderCode, setLastOrderCode] = useState("");
   const [lastOrderTotal, setLastOrderTotal] = useState(0);
@@ -172,7 +173,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <Header cartItemCount={cartItemCount} onGoHome={() => setActivePage("store")} onGoToCart={() => setActivePage("cart")} />
+      <Header
+        cartItemCount={cartItemCount}
+        onGoHome={() => setActivePage("store")}
+        onGoToCart={() => setActivePage("cart")}
+        onGoToInventory={() => setActivePage("inventory")}
+      />
 
       <main className="app__main">
         <div className="app__container">
@@ -251,6 +257,8 @@ export default function App() {
               onBackToStore={() => setActivePage("store")}
             />
           )}
+
+          {activePage === "inventory" && <InventoryManager />}
         </div>
       </main>
 

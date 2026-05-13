@@ -5,9 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..inventory_client import get_bulk_stock, get_stock
 from ..models import Product
-from ..schemas import ProductResponse, StockUpdateRequest
-from ..seed import refresh_products_stock_gauge
+from ..schemas import ProductResponse
 from ..simulation import simulation_state
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -15,33 +15,40 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[ProductResponse])
-def list_products(db: Session = Depends(get_db)):
+async def list_products(db: Session = Depends(get_db)):
     if simulation_state.catalog_unavailable.enabled:
         raise HTTPException(status_code=503, detail="Catálogo temporariamente indisponível")
-    return db.execute(select(Product).order_by(Product.id.asc())).scalars().all()
+    products = db.execute(select(Product).order_by(Product.id.asc())).scalars().all()
+    stock_map = await get_bulk_stock([p.id for p in products])
+    return [
+        ProductResponse(
+            id=p.id,
+            name=p.name,
+            description=p.description,
+            price=p.price,
+            # inventory-service é a fonte da verdade; fallback para valor em DB se indisponível
+            stock_quantity=stock_map.get(p.id, p.stock_quantity),
+            image_filename=p.image_filename,
+            created_at=p.created_at,
+        )
+        for p in products
+    ]
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
-def get_product(product_id: int, db: Session = Depends(get_db)):
+async def get_product(product_id: int, db: Session = Depends(get_db)):
     if simulation_state.product_error.enabled and simulation_state.product_error.product_id == product_id:
         raise HTTPException(status_code=500, detail="Falha simulada para produto específico")
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
-    return product
-
-
-@router.put("/{product_id}/stock", include_in_schema=False)
-def update_stock(product_id: int, payload: StockUpdateRequest, db: Session = Depends(get_db)):
-    """Endpoint interno: chamado pelo order-service após um checkout confirmado."""
-    product = db.get(Product, product_id)
-    if not product:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
-    new_qty = product.stock_quantity + payload.delta
-    if new_qty < 0:
-        raise HTTPException(status_code=409, detail="Estoque insuficiente")
-    product.stock_quantity = new_qty
-    db.commit()
-    refresh_products_stock_gauge(db)
-    logger.info("stock_updated", extra={"product_id": product_id, "delta": payload.delta, "new_qty": new_qty})
-    return {"product_id": product_id, "stock_quantity": new_qty}
+    qty = await get_stock(product_id)
+    return ProductResponse(
+        id=product.id,
+        name=product.name,
+        description=product.description,
+        price=product.price,
+        stock_quantity=qty if qty is not None else product.stock_quantity,
+        image_filename=product.image_filename,
+        created_at=product.created_at,
+    )

@@ -1,7 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .metrics import products_stock_quantity
 from .models import Product
 
 SEED_PRODUCTS = [
@@ -16,15 +15,9 @@ SEED_PRODUCTS = [
 ]
 
 
-def seed_products(db: Session):
+def seed_products(db: Session) -> None:
     for product_data in SEED_PRODUCTS:
         exists = db.execute(select(Product).where(Product.name == product_data["name"])).scalar_one_or_none()
         if not exists:
             db.add(Product(**product_data))
     db.commit()
-
-
-def refresh_products_stock_gauge(db: Session):
-    products = db.execute(select(Product)).scalars().all()
-    for product in products:
-        products_stock_quantity.labels(product_id=str(product.id), product_name=product.name).set(product.stock_quantity)
