@@ -112,7 +112,9 @@ services:
         condition: service_started
 
   frontend:
-    build: ./microservices/frontend
+    build:
+      context: ./microservices/frontend
+      target: development
     networks:
       - reliability-store
     environment:
