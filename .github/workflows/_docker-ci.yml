@@ -1,0 +1,215 @@
+# Workflow reutilizável de CI: qualidade, segurança, build e push para o ECR.
+# Chamado pelos workflows ci-<serviço>.yml. Não é disparado diretamente.
+name: Docker CI (reusável)
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Nome lógico do serviço (sufixo do repositório ECR)
+        required: true
+        type: string
+      context:
+        description: Diretório de build do Docker (contexto)
+        required: true
+        type: string
+      target:
+        description: Target do multi-stage build (vazio = estágio final)
+        required: false
+        type: string
+        default: ""
+      stack:
+        description: "Stack do serviço: python ou node"
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_PREFIX || 'reliability-store' }}/${{ inputs.service-name }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Qualidade + segurança de dependências.
+  # Todas as etapas usam continue-on-error: true nesta fase — elas reportam
+  # problemas, mas ainda não bloqueiam a pipeline (será endurecido depois).
+  # ---------------------------------------------------------------------------
+  quality:
+    name: Qualidade e segurança (${{ inputs.service-name }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ----- Python (FastAPI) -----
+      - name: Setup Python
+        if: inputs.stack == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint (ruff)
+        if: inputs.stack == 'python'
+        continue-on-error: true
+        working-directory: ${{ inputs.context }}
+        run: pipx run ruff check app
+
+      - name: Testes unitários (pytest)
+        if: inputs.stack == 'python'
+        continue-on-error: true
+        working-directory: ${{ inputs.context }}
+        run: |
+          python -m pip install --quiet -r requirements.txt pytest
+          python -m pytest tests -v
+
+      - name: Scan de dependências (pip-audit)
+        if: inputs.stack == 'python'
+        continue-on-error: true
+        working-directory: ${{ inputs.context }}
+        run: pipx run pip-audit -r requirements.txt
+
+      # ----- Node (React + Vite) -----
+      - name: Setup Node
+        if: inputs.stack == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instala dependências
+        if: inputs.stack == 'node'
+        working-directory: ${{ inputs.context }}
+        run: npm install
+
+      - name: Type-check (tsc)
+        if: inputs.stack == 'node'
+        continue-on-error: true
+        working-directory: ${{ inputs.context }}
+        run: npm run typecheck
+
+      - name: Scan de dependências (npm audit)
+        if: inputs.stack == 'node'
+        continue-on-error: true
+        working-directory: ${{ inputs.context }}
+        run: npm audit --audit-level=high
+
+  # ---------------------------------------------------------------------------
+  # Build da imagem (BuildKit + cache GHA), scan com Trivy e push para o ECR.
+  # Em pull_request a imagem é apenas construída e escaneada (sem credenciais
+  # AWS e sem push).
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: Build e push (${{ inputs.service-name }})
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC para assumir role na AWS
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # histórico completo para git describe (versionamento)
+
+      # Versionamento semântico:
+      # - push de tag vX.Y.Z  -> versão X.Y.Z (release; também publica latest)
+      # - push em branch      -> <última tag v*>-dev.<run_number> (fallback controlado)
+      - name: Resolve versão da imagem
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            IS_RELEASE=true
+          else
+            LAST_TAG=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || echo "v0.0.0")
+            VERSION="${LAST_TAG#v}-dev.${GITHUB_RUN_NUMBER}"
+            IS_RELEASE=false
+          fi
+          SHA_SHORT="${GITHUB_SHA::7}"
+          {
+            echo "version=${VERSION}"
+            echo "is_release=${IS_RELEASE}"
+            echo "sha_short=${SHA_SHORT}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Versão resolvida: ${VERSION} (release=${IS_RELEASE}, sha=${SHA_SHORT})"
+
+      - name: Configura credenciais AWS (OIDC)
+        if: github.event_name != 'pull_request' && vars.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configura credenciais AWS (access keys)
+        if: github.event_name != 'pull_request' && vars.AWS_ROLE_ARN == ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login no Amazon ECR
+        if: github.event_name != 'pull_request'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Monta as tags da imagem
+        id: tags
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Em PR não há push: tag local apenas para build/scan.
+            echo "tags=${{ inputs.service-name }}:pr-${{ github.event.number }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          IMAGE="${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}"
+          TAGS="${IMAGE}:${{ steps.version.outputs.version }},${IMAGE}:sha-${{ steps.version.outputs.sha_short }}"
+          if [[ "${{ steps.version.outputs.is_release }}" == "true" ]]; then
+            TAGS="${TAGS},${IMAGE}:latest"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build com cache do GitHub Actions; load local para o scan do Trivy.
+      - name: Build da imagem (com cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          target: ${{ inputs.target }}
+          load: true
+          push: false
+          tags: ${{ inputs.service-name }}:scan
+          cache-from: type=gha,scope=${{ inputs.service-name }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
+
+      - name: Scan da imagem (Trivy)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ inputs.service-name }}:scan
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      # Reaproveita o cache do build anterior — etapa rápida, só empacota e envia.
+      - name: Push para o ECR
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          target: ${{ inputs.target }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha,scope=${{ inputs.service-name }}
+
+      - name: Resumo
+        if: github.event_name != 'pull_request'
+        run: |
+          {
+            echo "### Imagem publicada — ${{ inputs.service-name }}"
+            echo ""
+            echo '```'
+            echo "${{ steps.tags.outputs.tags }}" | tr ',' '\n'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

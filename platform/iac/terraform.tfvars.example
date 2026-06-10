@@ -1,0 +1,23 @@
+# Copie para terraform.tfvars e ajuste conforme necessário.
+# NÃO commite terraform.tfvars (já ignorado no .gitignore).
+# Todos os valores abaixo são os padrões — o stack funciona sem tfvars.
+
+region          = "us-east-1"
+environment     = "lab"
+cluster_name    = "reliability-store"
+cluster_version = "1.32"
+
+# Rede (2 AZs, NAT único — configuração econômica de laboratório)
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.0.0/20", "10.0.16.0/20"]
+private_subnet_cidrs = ["10.0.32.0/20", "10.0.48.0/20"]
+
+# Restrinja ao seu IP se possível, ex.: ["203.0.113.10/32"]
+public_access_cidrs = ["0.0.0.0/0"]
+
+# Node group SPOT (1 node t3.medium por padrão)
+node_instance_types = ["t3.medium", "t3a.medium"]
+
+# ARN de user/role IAM com acesso admin ao cluster além do criador.
+# Útil quando o apply roda via CI e você quer acessar com seu usuário local.
+# admin_principal_arn = "arn:aws:iam::762103020993:user/vitor.aws"

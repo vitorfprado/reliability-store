@@ -1,0 +1,54 @@
+output "region" {
+  description = "Região AWS utilizada."
+  value       = var.region
+}
+
+output "vpc_id" {
+  description = "ID da VPC criada."
+  value       = module.vpc.vpc_id
+}
+
+output "private_subnet_ids" {
+  description = "Subnets privadas (onde rodam os nodes)."
+  value       = module.vpc.private_subnet_ids
+}
+
+output "public_subnet_ids" {
+  description = "Subnets públicas (futuros load balancers)."
+  value       = module.vpc.public_subnet_ids
+}
+
+output "nat_public_ips" {
+  description = "IPs públicos de saída (NAT Gateway)."
+  value       = module.vpc.nat_public_ips
+}
+
+output "cluster_name" {
+  description = "Nome do cluster EKS."
+  value       = module.eks.cluster_name
+}
+
+output "cluster_endpoint" {
+  description = "Endpoint da API do Kubernetes."
+  value       = module.eks.cluster_endpoint
+}
+
+output "cluster_security_group_id" {
+  description = "Security group gerenciado pelo EKS."
+  value       = module.eks.cluster_security_group_id
+}
+
+output "oidc_provider_arn" {
+  description = "ARN do OIDC provider (IRSA) — usado por roles de controllers futuros."
+  value       = module.eks.oidc_provider_arn
+}
+
+output "node_iam_role_arn" {
+  description = "ARN da IAM role dos nodes."
+  value       = module.eks.node_iam_role_arn
+}
+
+output "configure_kubectl" {
+  description = "Comando para configurar o kubeconfig local."
+  value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
+}
