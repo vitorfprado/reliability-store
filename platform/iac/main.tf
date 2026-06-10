@@ -133,9 +133,15 @@ module "rds" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnet_ids
 
-  # Rede privada: somente o cluster EKS pode conectar na porta do banco.
-  publicly_accessible        = false
-  allowed_security_group_ids = [module.eks.cluster_security_group_id]
+  # Acesso restrito às subnets privadas (onde rodam os nodes do EKS; os pods
+  # saem com IPs dessas subnets via VPC CNI). Banco sem IP público.
+  #
+  # Por que CIDR e não o security group do cluster: o ID do cluster SG só é
+  # conhecido após a criação do EKS, e o módulo usa for_each sobre o conjunto
+  # de SGs — o que falha no plan ("Invalid for_each argument"). Os CIDRs das
+  # subnets são estáticos, então resolvem no plan sem two-phase apply.
+  publicly_accessible = false
+  allowed_cidr_blocks = var.private_subnet_cidrs
 
   # Criptografia com a chave gerenciada aws/rds (sem custo de KMS dedicada).
   storage_encrypted = true

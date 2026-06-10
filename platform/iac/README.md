@@ -7,7 +7,7 @@ Provisiona a base mínima para o reliability-store rodar em EKS na AWS:
 - **1 node group SPOT** (`t3.medium`/`t3a.medium`, min 1 / desired 1 / max 2)
 - **Add-ons essenciais**: CoreDNS, kube-proxy, VPC CNI e EBS CSI Driver (com IRSA)
 - **IAM**: roles do control plane e dos nodes, OIDC provider (IRSA), access entries
-- **RDS PostgreSQL** (`db.t4g.micro`, Single-AZ, 20 GB) nas subnets privadas, acessível apenas pelo security group do cluster — senha no Secrets Manager
+- **RDS PostgreSQL** (`db.t4g.micro`, Single-AZ, 20 GB) nas subnets privadas, sem IP público e acessível apenas a partir dos CIDRs das subnets privadas (onde rodam os nodes/pods do EKS) — senha no Secrets Manager
 - **Role IRSA** (`<cluster>-db-secret-reader`) que permite aos service accounts da aplicação ler **apenas** o secret da senha do master do RDS
 
 Este diretório é um **consumer** dos módulos do repositório
