@@ -1,7 +1,7 @@
 # Infraestrutura mínima para o reliability-store rodar em EKS.
 #
-# Consome os módulos do repositório terraform-aws-modules via source relativo
-# (repo clonado como irmão deste — mesmo layout local e no GitHub Actions).
+# Consome os módulos do repositório github.com/vitorfprado/terraform-aws-modules
+# (branch main), conforme o padrão documentado nos READMEs dos próprios módulos.
 # Configuração de laboratório: 2 AZs, NAT único, 1 node group SPOT com 1 node.
 
 locals {
@@ -11,7 +11,7 @@ locals {
 }
 
 module "vpc" {
-  source = "../../../terraform-aws-modules/vpc"
+  source = "github.com/vitorfprado/terraform-aws-modules//vpc?ref=main"
 
   name       = "${var.cluster_name}-vpc"
   cidr_block = var.vpc_cidr
@@ -36,7 +36,7 @@ module "vpc" {
 }
 
 module "eks" {
-  source = "../../../terraform-aws-modules/eks"
+  source = "github.com/vitorfprado/terraform-aws-modules//eks?ref=main"
 
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version

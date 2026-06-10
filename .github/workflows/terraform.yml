@@ -4,9 +4,8 @@
 # - workflow_dispatch -> plan, apply ou destroy conforme o input "action"
 # - destroy exige digitar "destroy" no input de confirmação (proteção mínima)
 #
-# O consumer usa módulos do repo vitorfprado/terraform-aws-modules via source
-# relativo (../../../terraform-aws-modules/...). Por isso os dois repositórios
-# são clonados lado a lado dentro do workspace do runner.
+# Os módulos vêm direto de github.com/vitorfprado/terraform-aws-modules
+# (ref=main no source) — o terraform init faz o clone automaticamente.
 name: Terraform - infraestrutura EKS
 
 on:
@@ -43,7 +42,7 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   TF_IN_AUTOMATION: "true"
-  WORKING_DIR: reliability-store/platform/iac
+  WORKING_DIR: platform/iac
 
 jobs:
   terraform:
@@ -56,19 +55,8 @@ jobs:
           echo "::error::Destruição não confirmada. Reexecute preenchendo o input de confirmação com a palavra: destroy"
           exit 1
 
-      - name: Checkout - reliability-store
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: reliability-store
-
-      # Clonado como irmão do repo da aplicação para que o source relativo
-      # ../../../terraform-aws-modules/<modulo> resolva igual ao ambiente local.
-      - name: Checkout - terraform-aws-modules
-        uses: actions/checkout@v4
-        with:
-          repository: vitorfprado/terraform-aws-modules
-          ref: ${{ vars.TF_MODULES_REF || 'main' }}
-          path: terraform-aws-modules
 
       - name: Configura credenciais AWS (OIDC)
         if: vars.AWS_ROLE_ARN != ''

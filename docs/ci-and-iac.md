@@ -98,7 +98,6 @@ Usada automaticamente quando a variable `AWS_ROLE_ARN` não está definida.
 | Tipo | Nome | Default | Uso |
 |---|---|---|---|
 | Variable | `ECR_REPOSITORY_PREFIX` | `reliability-store` | prefixo dos repositórios ECR |
-| Variable | `TF_MODULES_REF` | `main` | branch/tag do repo `terraform-aws-modules` usada no CI |
 
 ## Permissões AWS necessárias
 
@@ -123,8 +122,8 @@ Resumo:
 - `Actions → Terraform - infraestrutura EKS → Run workflow`
 - `action = plan | apply | destroy`
 - `destroy` exige digitar `destroy` no campo de confirmação; nada é destruído por push
-- O workflow clona `vitorfprado/terraform-aws-modules` ao lado do repo da aplicação
-  para resolver os `source` relativos dos módulos
+- Os módulos vêm de `github.com/vitorfprado/terraform-aws-modules//<módulo>?ref=main`;
+  o `terraform init` faz o clone automaticamente
 
 ## Pendências conhecidas
 

@@ -10,22 +10,16 @@ Provisiona a base mínima para o reliability-store rodar em EKS na AWS:
 
 Este diretório é um **consumer** dos módulos do repositório
 [`vitorfprado/terraform-aws-modules`](https://github.com/vitorfprado/terraform-aws-modules)
-(`vpc` e `eks`), referenciados por **source relativo**:
+(`vpc` e `eks`), referenciados **direto do GitHub na branch `main`** — o padrão
+documentado nos READMEs dos próprios módulos:
 
 ```hcl
-source = "../../../terraform-aws-modules/vpc"
+source = "github.com/vitorfprado/terraform-aws-modules//vpc?ref=main"
 ```
 
-Ou seja, o repositório de módulos precisa estar clonado **como irmão** deste repositório:
-
-```
-<pasta-pai>/
-├── reliability-store/        (este repo)
-└── terraform-aws-modules/    (repo de módulos)
-```
-
-No GitHub Actions o workflow [`terraform.yml`](../../.github/workflows/terraform.yml)
-faz o checkout dos dois repositórios nesse mesmo layout.
+O `terraform init` clona o repositório de módulos automaticamente (requer `git`
+instalado). Para fixar uma versão estável, troque `ref=main` por uma tag/commit
+do repo de módulos.
 
 ## Pré-requisitos (bootstrap único, fora do Terraform)
 
