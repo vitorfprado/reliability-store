@@ -99,3 +99,98 @@ module "eks" {
 
   tags = local.tags
 }
+
+# ---------------------------------------------------------------------------
+# Banco de dados PostgreSQL gerenciado (RDS).
+#
+# Configuração de laboratório/teste — menor custo possível:
+# - db.t4g.micro (classe mais barata, elegível ao free tier)
+# - Single-AZ, sem réplicas, storage mínimo (20 GB gp3, sem autoscaling)
+# - Criptografia com a chave gerenciada aws/rds — sem KMS dedicada (mesma
+#   decisão do EKS: evita a janela de exclusão de 30 dias a cada apply/destroy)
+# - deletion_protection=false + skip_final_snapshot=true: permitem um
+#   `terraform destroy` limpo ao fim de cada sessão de estudo
+# - Sem backups nem Enhanced Monitoring (enxuga custo de storage/IAM)
+# - Senha do master gerada/rotacionada pelo Secrets Manager (nunca vai ao state)
+#
+# Rede privada: só o security group do cluster EKS pode conectar na porta.
+# ---------------------------------------------------------------------------
+module "rds" {
+  source = "github.com/vitorfprado/terraform-aws-modules//rds?ref=main"
+
+  name           = "${var.cluster_name}-db"
+  engine         = "postgres"
+  engine_version = var.db_engine_version
+  instance_class = var.db_instance_class
+
+  allocated_storage     = var.db_allocated_storage
+  max_allocated_storage = 0 # sem autoscaling de storage
+
+  db_name  = var.db_name
+  username = var.db_username
+  # manage_master_user_password = true (padrão): senha no Secrets Manager.
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnet_ids
+
+  # Rede privada: somente o cluster EKS pode conectar na porta do banco.
+  publicly_accessible        = false
+  allowed_security_group_ids = [module.eks.cluster_security_group_id]
+
+  # Criptografia com a chave gerenciada aws/rds (sem custo de KMS dedicada).
+  storage_encrypted = true
+  create_kms_key    = false
+
+  # Flags de laboratório: destroy limpo, sem proteção nem snapshot final.
+  deletion_protection = false
+  skip_final_snapshot = true
+
+  # Enxuga custo: sem backups e sem role de Enhanced Monitoring.
+  backup_retention_period = 0
+  create_monitoring_role  = false
+
+  tags = local.tags
+}
+
+# ---------------------------------------------------------------------------
+# IRSA: permissão para os pods lerem a senha do master do RDS no Secrets Manager.
+#
+# A senha é gerada/rotacionada pela AWS (manage_master_user_password) e nunca vai
+# ao state — então o pod precisa buscá-la em runtime. Esta role é assumida via
+# OIDC pelos service accounts informados em var.db_service_accounts (namespace
+# var.app_namespace) e só permite ler ESTE secret específico.
+#
+# Decrypt não precisa de kms:Decrypt explícito: o secret usa a chave gerenciada
+# aws/secretsmanager, cuja policy já libera a conta através do serviço.
+#
+# Anexe a role ao service account com a annotation:
+#   eks.amazonaws.com/role-arn: <output db_secret_reader_role_arn>
+# ---------------------------------------------------------------------------
+data "aws_iam_policy_document" "rds_secret_read" {
+  statement {
+    sid    = "ReadRdsMasterSecret"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+    ]
+    resources = [module.rds.master_user_secret_arn]
+  }
+}
+
+module "irsa_db_secret" {
+  source = "github.com/vitorfprado/terraform-aws-modules//iam-irsa?ref=main"
+
+  name              = "${var.cluster_name}-db-secret-reader"
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
+
+  namespace        = var.app_namespace
+  service_accounts = var.db_service_accounts
+
+  inline_policies = {
+    rds-secret-read = data.aws_iam_policy_document.rds_secret_read.json
+  }
+
+  tags = local.tags
+}

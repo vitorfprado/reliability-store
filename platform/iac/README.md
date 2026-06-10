@@ -7,6 +7,8 @@ Provisiona a base mínima para o reliability-store rodar em EKS na AWS:
 - **1 node group SPOT** (`t3.medium`/`t3a.medium`, min 1 / desired 1 / max 2)
 - **Add-ons essenciais**: CoreDNS, kube-proxy, VPC CNI e EBS CSI Driver (com IRSA)
 - **IAM**: roles do control plane e dos nodes, OIDC provider (IRSA), access entries
+- **RDS PostgreSQL** (`db.t4g.micro`, Single-AZ, 20 GB) nas subnets privadas, acessível apenas pelo security group do cluster — senha no Secrets Manager
+- **Role IRSA** (`<cluster>-db-secret-reader`) que permite aos service accounts da aplicação ler **apenas** o secret da senha do master do RDS
 
 Este diretório é um **consumer** dos módulos do repositório
 [`vitorfprado/terraform-aws-modules`](https://github.com/vitorfprado/terraform-aws-modules)
@@ -102,6 +104,7 @@ Pull requests que tocam `platform/iac/**` executam plan automaticamente (nunca a
 | Control plane EKS | ~73 |
 | NAT Gateway (único) | ~33 + tráfego |
 | 1x t3.medium SPOT | ~9–12 |
+| RDS `db.t4g.micro` Single-AZ + 20 GB gp3 | ~13 (ou ~0 no free tier) |
 | EBS/CloudWatch | ~1–3 |
 
 **Para laboratório: rode `destroy` ao final de cada sessão de estudo.** O state
@@ -113,4 +116,5 @@ remoto preserva a configuração e o `apply` recria tudo em ~15 minutos.
 - `capacity_type = "SPOT"` com 2 tipos de instância — até ~70% mais barato
 - `create_kms_key = false` — sem criptografia de secrets por KMS nesta fase (evita custo e a janela de exclusão de 30 dias da chave a cada ciclo apply/destroy)
 - `cluster_enabled_log_types = ["api"]` + retenção de 7 dias no CloudWatch
+- RDS `db.t4g.micro` Single-AZ, `create_kms_key = false` (usa a chave gerenciada `aws/rds`), `backup_retention_period = 0`, `deletion_protection = false` e `skip_final_snapshot = true` — banco descartável de teste, destruído junto com o resto
 - Sem ArgoCD/Prometheus/ALB Controller etc. — serão adicionados na fase de CD

@@ -63,3 +63,47 @@ variable "admin_principal_arn" {
   type        = string
   default     = null
 }
+
+# --- Banco de dados (RDS PostgreSQL) ---
+
+variable "db_engine_version" {
+  description = "Versão do PostgreSQL no RDS (alinhada ao postgres:16 do ambiente local)."
+  type        = string
+  default     = "16"
+}
+
+variable "db_instance_class" {
+  description = "Classe da instância RDS. db.t4g.micro é a mais barata e elegível ao free tier."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "Storage alocado no RDS, em GB (mínimo 20 para gp3)."
+  type        = number
+  default     = 20
+}
+
+variable "db_name" {
+  description = "Nome do banco de dados inicial criado no RDS."
+  type        = string
+  default     = "reliability_store"
+}
+
+variable "db_username" {
+  description = "Usuário master do banco."
+  type        = string
+  default     = "reliability"
+}
+
+variable "app_namespace" {
+  description = "Namespace Kubernetes onde rodam os serviços que acessam o banco (usado pela role IRSA)."
+  type        = string
+  default     = "reliability-store"
+}
+
+variable "db_service_accounts" {
+  description = "Service accounts autorizados a assumir a role IRSA que lê o secret do RDS. Use [\"*\"] para todos no namespace."
+  type        = list(string)
+  default     = ["inventory-service", "product-service", "order-service"]
+}

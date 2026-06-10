@@ -18,6 +18,17 @@ public_access_cidrs = ["0.0.0.0/0"]
 # Node group SPOT (1 node t3.medium por padrão)
 node_instance_types = ["t3.medium", "t3a.medium"]
 
+# Banco de dados (RDS PostgreSQL — configuração de teste, menor custo)
+db_engine_version    = "16"
+db_instance_class    = "db.t4g.micro"
+db_allocated_storage = 20
+db_name              = "reliability_store"
+db_username          = "reliability"
+
+# IRSA: namespace e service accounts que poderão ler o secret do RDS
+app_namespace       = "reliability-store"
+db_service_accounts = ["inventory-service", "product-service", "order-service"]
+
 # ARN de user/role IAM com acesso admin ao cluster além do criador.
 # Útil quando o apply roda via CI e você quer acessar com seu usuário local.
 # admin_principal_arn = "arn:aws:iam::762103020993:user/vitor.aws"
