@@ -1,0 +1,119 @@
+# Esteira de IaC: provisiona e destrói a infraestrutura EKS (platform/iac).
+#
+# - pull_request em platform/iac/** -> fmt + validate + plan (somente leitura)
+# - workflow_dispatch -> plan, apply ou destroy conforme o input "action"
+# - destroy exige digitar "destroy" no input de confirmação (proteção mínima)
+#
+# O consumer usa módulos do repo vitorfprado/terraform-aws-modules via source
+# relativo (../../../terraform-aws-modules/...). Por isso os dois repositórios
+# são clonados lado a lado dentro do workspace do runner.
+name: Terraform - infraestrutura EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Ação do Terraform
+        type: choice
+        required: true
+        default: plan
+        options:
+          - plan
+          - apply
+          - destroy
+      confirm_destroy:
+        description: Digite "destroy" para confirmar a destruição
+        type: string
+        required: false
+        default: ""
+  pull_request:
+    paths:
+      - "platform/iac/**"
+      - ".github/workflows/terraform.yml"
+
+# Nunca rodar dois apply/destroy em paralelo (lock de state + segurança).
+concurrency:
+  group: terraform-iac
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC para assumir role na AWS
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TF_IN_AUTOMATION: "true"
+  WORKING_DIR: reliability-store/platform/iac
+
+jobs:
+  terraform:
+    name: terraform ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'plan (PR)' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Valida confirmação de destroy
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy' && inputs.confirm_destroy != 'destroy'
+        run: |
+          echo "::error::Destruição não confirmada. Reexecute preenchendo o input de confirmação com a palavra: destroy"
+          exit 1
+
+      - name: Checkout - reliability-store
+        uses: actions/checkout@v4
+        with:
+          path: reliability-store
+
+      # Clonado como irmão do repo da aplicação para que o source relativo
+      # ../../../terraform-aws-modules/<modulo> resolva igual ao ambiente local.
+      - name: Checkout - terraform-aws-modules
+        uses: actions/checkout@v4
+        with:
+          repository: vitorfprado/terraform-aws-modules
+          ref: ${{ vars.TF_MODULES_REF || 'main' }}
+          path: terraform-aws-modules
+
+      - name: Configura credenciais AWS (OIDC)
+        if: vars.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configura credenciais AWS (access keys)
+        if: vars.AWS_ROLE_ARN == ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.4"
+
+      - name: Terraform fmt
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform plan
+        if: github.event_name == 'pull_request' || inputs.action != 'destroy'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform plan (destroy)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform plan -destroy -input=false -out=tfplan
+
+      # Aplica o plano gerado acima — vale tanto para apply quanto para destroy.
+      - name: Terraform apply
+        if: github.event_name == 'workflow_dispatch' && (inputs.action == 'apply' || inputs.action == 'destroy')
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform apply -input=false tfplan

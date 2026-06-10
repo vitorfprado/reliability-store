@@ -33,6 +33,7 @@ Fluxo de checkout:
 - Aplicação funcional: catálogo, carrinho, checkout, **gerenciador de estoque**.
 - Observabilidade completa: traces distribuídos (OTEL → Tempo), logs JSON com `trace_id` (Loki), métricas Prometheus.
 - Simulações de falha disponíveis via API (`/admin/simulation`) — sem controles no frontend nesta fase.
+- CI no GitHub Actions (build + push para o ECR com versionamento semântico) e IaC Terraform para EKS — veja [docs/ci-and-iac.md](docs/ci-and-iac.md) e [platform/iac/README.md](platform/iac/README.md).
 
 ## Stack
 

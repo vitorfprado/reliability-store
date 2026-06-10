@@ -1,0 +1,36 @@
+name: CI - frontend
+
+# Push em main com mudanças no serviço -> build + push versão dev.
+# Push de tag vX.Y.Z -> build + push release (filtro de paths não se aplica a tags).
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+    paths:
+      - "microservices/frontend/**"
+      - ".github/workflows/ci-frontend.yml"
+      - ".github/workflows/_docker-ci.yml"
+  pull_request:
+    paths:
+      - "microservices/frontend/**"
+      - ".github/workflows/ci-frontend.yml"
+      - ".github/workflows/_docker-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_docker-ci.yml
+    with:
+      service-name: frontend
+      context: microservices/frontend
+      target: production
+      stack: node
+    secrets: inherit

@@ -1,0 +1,36 @@
+name: CI - order-service
+
+# Push em main com mudanças no serviço -> build + push versão dev.
+# Push de tag vX.Y.Z -> build + push release (filtro de paths não se aplica a tags).
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+    paths:
+      - "microservices/order-service/**"
+      - ".github/workflows/ci-order-service.yml"
+      - ".github/workflows/_docker-ci.yml"
+  pull_request:
+    paths:
+      - "microservices/order-service/**"
+      - ".github/workflows/ci-order-service.yml"
+      - ".github/workflows/_docker-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-order-service-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_docker-ci.yml
+    with:
+      service-name: order-service
+      context: microservices/order-service
+      target: runtime
+      stack: python
+    secrets: inherit
