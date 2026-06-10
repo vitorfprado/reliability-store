@@ -20,8 +20,15 @@ on:
           - plan
           - apply
           - destroy
+      # Confirmação de destroy em duas etapas (o GitHub não permite habilitar/
+      # desabilitar campos dinamicamente, então validamos os dois no job).
       confirm_destroy:
-        description: Digite "destroy" para confirmar a destruição
+        description: 'DESTROY — marque para habilitar a destruição (ignorado em plan/apply)'
+        type: boolean
+        required: false
+        default: false
+      confirm_phrase:
+        description: 'DESTROY — digite DESTROY (em MAIÚSCULO) para confirmar'
         type: string
         required: false
         default: ""
@@ -49,11 +56,19 @@ jobs:
     name: terraform ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'plan (PR)' }}
     runs-on: ubuntu-latest
     steps:
+      # Destroy só prossegue com a caixa marcada E a palavra DESTROY (maiúscula).
       - name: Valida confirmação de destroy
-        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy' && inputs.confirm_destroy != 'destroy'
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
         run: |
-          echo "::error::Destruição não confirmada. Reexecute preenchendo o input de confirmação com a palavra: destroy"
-          exit 1
+          if [[ "${{ inputs.confirm_destroy }}" != "true" ]]; then
+            echo "::error::Marque a caixa \"DESTROY — marque para habilitar a destruição\" para prosseguir."
+            exit 1
+          fi
+          if [[ "${{ inputs.confirm_phrase }}" != "DESTROY" ]]; then
+            echo "::error::Confirmação inválida. Digite exatamente DESTROY (em MAIÚSCULO) no campo de confirmação."
+            exit 1
+          fi
+          echo "Destruição confirmada: caixa marcada + frase DESTROY."
 
       - name: Checkout
         uses: actions/checkout@v4

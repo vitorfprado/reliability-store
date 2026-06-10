@@ -93,7 +93,7 @@ Workflow **Terraform - infraestrutura EKS** (`Actions → Terraform - infraestru
 |---|---|
 | `action: plan` | fmt + validate + plan (somente leitura) |
 | `action: apply` | plan + apply automático |
-| `action: destroy` + `confirm_destroy: destroy` | plan -destroy + apply. Sem a confirmação digitada, o job falha antes de qualquer ação |
+| `action: destroy` + caixa `confirm_destroy` marcada + `confirm_phrase: DESTROY` | plan -destroy + apply. Sem a caixa marcada **e** a palavra `DESTROY` (maiúscula), o job falha antes de qualquer ação |
 
 Pull requests que tocam `platform/iac/**` executam plan automaticamente (nunca apply/destroy).
 
